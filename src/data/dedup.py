@@ -62,18 +62,34 @@ def run_deduplication(
     df = manifest_df.copy()
     df = df.sort_values(by=["rel_path"]).reset_index(drop=True)
 
-    byte_hashes: List[str] = []
-    pixel_hashes: List[str] = []
+    has_byte = "byte_hash" in df.columns and df["byte_hash"].notna().all() and (df["byte_hash"] != "").all()
+    has_sha = "sha256" in df.columns and df["sha256"].notna().all() and (df["sha256"] != "").all()
 
-    for _, row in df.iterrows():
-        p = kermany_root / row["rel_path"]
-        b_hash = compute_byte_hash(p)
-        byte_hashes.append(b_hash)
-        if check_pixel_hash:
-            p_hash, (w, h) = compute_pixel_hash(p)
-            pixel_hashes.append(p_hash)
-        else:
-            pixel_hashes.append(b_hash)
+    if has_byte:
+        byte_hashes = df["byte_hash"].tolist()
+    elif has_sha:
+        byte_hashes = df["sha256"].tolist()
+    else:
+        byte_hashes = []
+        for _, row in df.iterrows():
+            p = kermany_root / row["rel_path"]
+            byte_hashes.append(compute_byte_hash(p))
+
+    if "pixel_hash" in df.columns and df["pixel_hash"].notna().all() and (df["pixel_hash"] != "").all():
+        pixel_hashes = df["pixel_hash"].tolist()
+    elif check_pixel_hash:
+        pixel_cache: Dict[str, str] = {}
+        pixel_hashes = []
+        for b_hash, (_, row) in zip(byte_hashes, df.iterrows()):
+            if b_hash in pixel_cache:
+                pixel_hashes.append(pixel_cache[b_hash])
+            else:
+                p = kermany_root / row["rel_path"]
+                p_hash, _ = compute_pixel_hash(p)
+                pixel_cache[b_hash] = p_hash
+                pixel_hashes.append(p_hash)
+    else:
+        pixel_hashes = list(byte_hashes)
 
     df["byte_hash"] = byte_hashes
     df["pixel_hash"] = pixel_hashes
