@@ -1,0 +1,13 @@
+# Library tambahan (dipakai di Colab DAN lokal). torch/torchvision TIDAK di sini: pakai bawaan Colab.
+# Versi di-pin dan diverifikasi terpasang di venv lokal (lihat requirements-local.lock.txt untuk freeze lengkap).
+# Catat versi di awal tiap notebook (sel 1 seragam).
+timm==1.0.15
+scikit-learn==1.6.1
+scipy==1.15.2
+pandas==2.2.3
+pyarrow==19.0.1
+opencv-python-headless==4.11.0.86
+matplotlib==3.10.0
+pyyaml==6.0.2
+pytest==8.3.5
+tqdm==4.67.1

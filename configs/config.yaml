@@ -1,0 +1,182 @@
+# =============================================================================
+# config.yaml — Evaluasi Lokalisasi Grad-CAM pada Klasifikasi Pneumonia
+#               (EfficientNet-B0, Fusi Multi-Channel Berbasis Segmentasi Paru)
+#
+# `locked:`  = nilai yang DITETAPKAN PROPOSAL. Dilarang diubah tanpa mengubah
+#              proposal. Setiap butir memuat `value` dan `ref` (rujukan).
+#              tests/test_proposal_conformity.py membandingkan SEMUA nilai di sini
+#              dengan konstanta independen di test; gagal bila ada yang beda.
+# `assumed:` = default yang DIPILIH PENULIS KODE karena proposal ambigu
+#              (lihat docs/AMBIGUITIES.md; id AMBIG-n). Bukan nilai proposal.
+# `runtime:` = path, jumlah worker, DEBUG, flag Colab (bukan bagian desain eksperimen).
+#
+# Rujukan `ref`: <berkas>.tex L<baris> | hlm <halaman FISIK main.pdf (44 hlm)>.
+#   Bab I = hlm 5, Bab II = hlm 12, Bab III = hlm 28 (hlm fisik, bukan nomor cetak).
+# Sumber kebenaran = file .tex terbaru (lebih baru dari kedua main.pdf).
+# =============================================================================
+
+locked:
+
+  data:
+    total_images:        {value: 5856, ref: "Metodologi.tex L22 | hlm 29-30"}
+    n_normal:            {value: 1583, ref: "Metodologi.tex L22, Tabel 3.1 | hlm 30"}
+    n_pneumonia:         {value: 4273, ref: "Metodologi.tex L22, Tabel 3.1 | hlm 30"}
+    builtin_test_images: {value: 624,  ref: "Metodologi.tex L24 | hlm 30"}
+    split_ratio_train:   {value: 0.70, ref: "Metodologi.tex L36 | hlm 30"}
+    split_ratio_val:     {value: 0.15, ref: "Metodologi.tex L36 | hlm 30"}
+    split_ratio_test:    {value: 0.15, ref: "Metodologi.tex L36 | hlm 30"}
+    # Tabel 3.1 = rencana alokasi PRA-deduplikasi (acuan perbandingan, bukan target keras)
+    table31_train:       {value: {normal: 1108, pneumonia: 2991, total: 4099}, ref: "Metodologi.tex L56 | hlm 31"}
+    table31_val:         {value: {normal: 237,  pneumonia: 641,  total: 878},  ref: "Metodologi.tex L57 | hlm 31"}
+    table31_test:        {value: {normal: 238,  pneumonia: 641,  total: 879},  ref: "Metodologi.tex L58 | hlm 31"}
+    grayscale_channels:  {value: 1,    ref: "Metodologi.tex L81 | hlm 33"}
+    intensity_range:     {value: [0.0, 1.0], ref: "docs/1.md D5 (skala [0,1] sebelum normalisasi)"}
+
+  lung_mask:
+    unet_frozen:               {value: true, ref: "Pendahuluan.tex L56; Metodologi.tex L68 | hlm 31"}
+    binarize_threshold:        {value: 0.5,  ref: "Metodologi.tex L77 | hlm 32"}
+    keep_largest_components:   {value: 2,    ref: "Metodologi.tex L77 | hlm 32"}
+    hole_filling:              {value: true, ref: "Metodologi.tex L77 | hlm 32"}
+    qc_dsc_min:                {value: 0.85, ref: "Metodologi.tex L14, L73 | hlm 29,32"}
+    qc_iou_min:                {value: 0.75, ref: "Metodologi.tex L14, L73 | hlm 29,32"}
+    qc_per_class:              {value: true, ref: "Metodologi.tex L73 | hlm 32"}
+    qc_rsua_total:             {value: 85,   ref: "Metodologi.tex L71 | hlm 31"}
+    qc_rsua_pneumonia:         {value: 53,   ref: "Metodologi.tex L71 | hlm 31"}
+    qc_rsua_normal:            {value: 32,   ref: "Metodologi.tex L71 | hlm 31"}
+    rsua_covid_excluded:       {value: 207,  ref: "Kajian-Pustaka.tex L188; docs/1.md L3 | hlm 31"}
+    rsua_mask_size:            {value: [256, 256], ref: "Kajian-Pustaka.tex L188 | Tabel 2.2"}
+    qc_kermany_total:          {value: 50,   ref: "Metodologi.tex L73 | hlm 32"}
+    qc_kermany_normal:         {value: 25,   ref: "Metodologi.tex L73 | hlm 32"}
+    qc_kermany_pneumonia:      {value: 25,   ref: "Metodologi.tex L73 | hlm 32"}
+    r_paru_extreme_threshold:  {value: 0.05, ref: "Metodologi.tex L73 | hlm 32"}
+    r_paru_class_diff_threshold: {value: 0.05, ref: "Metodologi.tex L77 | hlm 32"}
+
+  preprocess:
+    image_size:        {value: 224, ref: "Metodologi.tex L79 | hlm 32"}
+    mask_interp:       {value: nearest, ref: "Metodologi.tex L79 | hlm 32"}
+    imagenet_mean:     {value: [0.485, 0.456, 0.406], ref: "Metodologi.tex L81 (statistik ImageNet standar, Deng2009)"}
+    imagenet_std:      {value: [0.229, 0.224, 0.225], ref: "Metodologi.tex L81 (statistik ImageNet standar, Deng2009)"}
+    mask_channel_normalized: {value: false, ref: "Metodologi.tex L81, L130 | hlm 33,37"}
+    hardmask_before_normalization: {value: true, ref: "Metodologi.tex L81, L111 | hlm 33,36"}
+
+  augmentation:       # hanya D_train
+    rotation_deg:     {value: 15,  ref: "Metodologi.tex L83 | hlm 33"}
+    hflip_p:          {value: 0.5, ref: "Metodologi.tex L83 | hlm 33"}
+    translate_frac:   {value: 0.10, ref: "Metodologi.tex L83 | hlm 33"}
+    zoom_range:       {value: [0.9, 1.1], ref: "Metodologi.tex L83 | hlm 33"}
+    fill_value:       {value: 0, ref: "Metodologi.tex L83 | hlm 33"}
+    image_interp:     {value: bilinear, ref: "Metodologi.tex L83 | hlm 33"}
+    mask_interp:      {value: nearest,  ref: "Metodologi.tex L83 | hlm 33"}
+    identical_params_for_pair: {value: true, ref: "Metodologi.tex L83 | hlm 33"}
+    val_test_augmentation: {value: false, ref: "Metodologi.tex L83 | hlm 33"}
+
+  model:
+    architecture:      {value: efficientnet_b0, ref: "Metodologi.tex L86 | hlm 34"}
+    pretrained:        {value: imagenet, ref: "Metodologi.tex L86 | hlm 34"}
+    full_finetuning:   {value: true, ref: "Metodologi.tex L133 | hlm 35"}
+    stem_conv_3ch:     {value: [32, 3, 3, 3], ref: "Metodologi.tex L111 | hlm 36"}
+    stem_conv_4ch:     {value: [32, 4, 3, 3], ref: "Metodologi.tex L117 | hlm 36"}
+    stem_ch4_init:     {value: mean_of_rgb_pretrained, ref: "Metodologi.tex Pers. 3.2 L119-126 | hlm 36-37"}
+    head_feature_map:  {value: [1280, 7, 7], ref: "Metodologi.tex L130 | hlm 37"}
+    dropout:           {value: 0.2, ref: "Metodologi.tex L130, Tabel 3.2 | hlm 37"}
+    n_logits:          {value: 1, ref: "Metodologi.tex L130 | hlm 37"}
+    decision_threshold: {value: 0.5, ref: "Metodologi.tex L130 | hlm 37"}
+    positive_class:    {value: pneumonia, ref: "Metodologi.tex L251 | hlm 40"}
+
+  train:
+    loss:              {value: bce_unweighted, ref: "Metodologi.tex L133 | hlm 35"}
+    cam_penalty:       {value: false, ref: "Metodologi.tex L133 | hlm 35"}
+    optimizer:         {value: adamw, ref: "Metodologi.tex L133 | hlm 35"}
+    lr:                {value: 1.0e-4, ref: "Metodologi.tex L133, Tabel 3.2 | hlm 35"}
+    weight_decay:      {value: 1.0e-4, ref: "Metodologi.tex Tabel 3.2 L176 | hlm 36"}
+    lr_scheduler:      {value: none, ref: "Metodologi.tex L133 ('laju belajar tetap') | hlm 35"}
+    batch_size:        {value: 32, ref: "Metodologi.tex Tabel 3.2 L179 | hlm 36"}
+    max_epochs:        {value: 50, ref: "Metodologi.tex Tabel 3.2 L178 | hlm 36"}
+    early_stopping_patience: {value: 10, ref: "Metodologi.tex Tabel 3.2 L181 | hlm 36"}
+    early_stopping_monitor:  {value: val_loss, ref: "Metodologi.tex Tabel 3.2 L181 | hlm 36"}
+    keep_best_val_loss_weights: {value: true, ref: "Metodologi.tex L216 (Algoritma 3.1) | hlm 38"}
+    seeds:             {value: [42, 100, 2024, 2025, 2026], ref: "Metodologi.tex L140 | hlm 36"}
+    configs:           {value: [baseline_3ch, hardmask_3ch, fusion_4ch], ref: "Metodologi.tex L5 | hlm 29"}
+    n_runs:            {value: 15, ref: "3 konfigurasi x 5 seed (Metodologi.tex L140)"}
+    deterministic:     {value: true, ref: "Metodologi.tex L133 | hlm 35"}
+    precision:         {value: fp32, ref: "docs/1.md M3 (AMP default off)"}
+    split_fixed_across_seeds: {value: true, ref: "Metodologi.tex L36 | hlm 30"}
+
+  xai:
+    method:            {value: gradcam, ref: "Metodologi.tex L220 | hlm 38"}
+    target_class:      {value: predicted_class, ref: "Pendahuluan.tex L54; Kajian-Pustaka.tex L328 | hlm 26"}
+    target_score_pos:  {value: "+z", ref: "Kajian-Pustaka.tex L328 | hlm 26"}
+    target_score_neg:  {value: "-z", ref: "Kajian-Pustaka.tex L328 | hlm 26"}
+    on_split:          {value: test_no_augmentation, ref: "Metodologi.tex L217; Gambar 3.1 panah merah | hlm 28-29,38"}
+    upsample:          {value: bilinear, ref: "Kajian-Pustaka.tex L328 | hlm 26"}
+    normalize:         {value: minmax_0_1, ref: "Kajian-Pustaka.tex L328 | hlm 26"}
+    acr_epsilon:       {value: 1.0e-6, ref: "Kajian-Pustaka.tex L336 | hlm 27"}
+    iou_top_fraction:  {value: 0.30, ref: "Kajian-Pustaka.tex L338 | hlm 27-28"}
+    heatmap_size:      {value: [224, 224], ref: "Metodologi.tex L251 | hlm 40"}
+
+  metrics:
+    primary_classification:    {value: [auc_roc, f1], ref: "Metodologi.tex L251 | hlm 40"}
+    supporting_classification: {value: [accuracy, precision, recall, specificity, balanced_accuracy], ref: "Metodologi.tex L251 | hlm 40"}
+    localization_primary:      {value: acr, ref: "Metodologi.tex L251 | hlm 40"}
+    localization_complement:   {value: iou_paru, ref: "Metodologi.tex L251 | hlm 40"}
+    localization_normalized:   {value: acr_norm, ref: "Metodologi.tex L77, L251 | hlm 32,40"}
+
+  stats:
+    unit_of_analysis:          {value: patient, ref: "Metodologi.tex L253 | hlm 39"}
+    bootstrap_B:               {value: 1000, ref: "Metodologi.tex L253 | hlm 39"}
+    bootstrap_ci_level:        {value: 0.95, ref: "Metodologi.tex L253 | hlm 39"}
+    bootstrap_ci_method:       {value: percentile, ref: "docs/1.md S4 (CI persentil)"}
+    bootstrap_resample_level:  {value: patient, ref: "Metodologi.tex L253 | hlm 39"}
+    wilcoxon_alternative:      {value: two-sided, ref: "Metodologi.tex L253 | hlm 39"}
+    multiple_testing:          {value: holm_bonferroni, ref: "Metodologi.tex L253 | hlm 39"}
+    alpha:                     {value: 0.05, ref: "Metodologi.tex L253 | hlm 39"}
+    holm_family_h1:            {value: [auc_roc, f1], ref: "Metodologi.tex L257 | hlm 39"}
+    holm_family_h2:            {value: [acr, iou_paru], ref: "Metodologi.tex L258 | hlm 40"}
+    stability_sigma_auc_max:   {value: 0.010, ref: "Metodologi.tex L243 | hlm 38"}
+    stability_no_nan_loss:     {value: true, ref: "Metodologi.tex L243 | hlm 38"}
+    min_group_n_per_seed:      {value: 5, ref: "Metodologi.tex L247 | hlm 38"}
+    h1_noninferiority_margin:  {value: -0.010, ref: "Pendahuluan.tex L63; Metodologi.tex L257 | hlm 9-10,39"}
+    h1_vs_hardmask_lower_ci:   {value: 0.0, ref: "Metodologi.tex L257 | hlm 39"}
+    h2_delta_acr_min:          {value: 0.020, ref: "Pendahuluan.tex L65; Metodologi.tex L258 | hlm 10,40"}
+    h2_delta_iou_min:          {value: 0.010, ref: "Pendahuluan.tex L65; Metodologi.tex L258 | hlm 10,40"}
+    h2_lower_ci:               {value: 0.0, ref: "Metodologi.tex L258 | hlm 40"}
+
+# -----------------------------------------------------------------------------
+assumed:   # default penulis-kode untuk ambiguitas; catat di docs/AMBIGUITIES.md
+  split_seed:                  {value: 42, ambig: AMBIG-3}
+  image_interp_resize:         {value: bilinear, ambig: AMBIG-4}
+  unet_prob_resize_before_thr: {value: true, ambig: AMBIG-1}
+  dedup_hashes:                {value: [sha256_bytes, sha256_pixels], ambig: AMBIG-2}
+  gradcam_target_layer:        {value: conv_head, ambig: AMBIG-5}    # alternatif: bn2, act2
+  iou_top_quantile:            {value: 0.70, ambig: AMBIG-7}
+  r_paru_source:               {value: m224, ambig: AMBIG-14}
+  cache_dtype:                 {value: float32, ambig: AMBIG-17}
+  qc_kermany_selection_seed:   {value: 42, ambig: "L3(2) seed tetap"}
+  patient_id_regex:            # DEV-1 [PERLU PERSETUJUAN]; default A1 (rilis Mendeley)
+    value: '^(?P<cls>NORMAL|BACTERIA|VIRUS)-(?P<pid>\d+)-(?P<seq>\d+)\.jpeg$'
+    ambig: DEV-1
+
+# -----------------------------------------------------------------------------
+runtime:
+  project_root_colab:   /content/drive/MyDrive/LAB_TA_GradCAM_Pneumonia
+  project_root_env:     PROJECT_ROOT          # variabel lingkungan (lokal)
+  project_root_local_default: ./local_mirror
+  work_dir_colab:       /content/work         # salinan data ke disk lokal Colab
+  rel_paths:
+    kermany_raw:        data/raw/kermany/chest_xray
+    rsua_validated:     "data/raw/rsua/Data Chest X-Ray RSUA (Validated)-20230618T025557Z-001/Data Chest X-Ray RSUA (Validated)"
+    rsua_class_dirs:    {Pneumonia: Non_Covid_Pneumonia, Normal: Non_Covid, Excluded_Covid: Covid}
+    kermany_manual_masks: data/raw/kermany_manual_masks
+    seg_public:         data/raw/seg_public
+    interim:            data/interim
+    processed:          data/processed
+    unet_weights_dir:   models/unet_frozen
+    outputs:            outputs
+  DEBUG:                false
+  debug_subset_per_class: 64
+  debug_epochs:         2
+  debug_seeds:          [42]
+  num_workers:          2
+  ACKNOWLEDGE_QC_FAIL:  false
+  save_overlay_samples: true
+  code_source:          drive            # drive | git (git clone private via Colab Secrets)

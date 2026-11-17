@@ -1,0 +1,2 @@
+# HANYA untuk verifikasi Gerbang 4 (cross-check Grad-CAM). Tidak dipakai untuk hasil akhir.
+grad-cam

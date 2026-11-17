@@ -1,0 +1,11 @@
+.venv/
+local_mirror/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+*.pt
+*.pth
+*.npy
+*.parquet
+.DS_Store

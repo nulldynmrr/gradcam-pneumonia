@@ -1,0 +1,66 @@
+# Konformitas Gambar 3.1 (Desain Arsitektur) — sumber: figure/Desain Arsitektur.pdf (BUKAN PNG di PROPOSAL\gambar yang punya typo)
+# tests/test_diagram_conformity.py:
+#   - gagal bila ada tahap/kotak tanpa notebook ATAU modul yang ada di disk,
+#   - gagal bila ada notebook di notebooks/ yang tidak terdaftar di `stages` maupun `infrastructure_notebooks`.
+# Label persis dari gambar dipakai di registry, nama kolom, legenda, dan tabel.
+
+labels:
+  baseline_3ch:  "Baseline 3-channel"
+  hardmask_3ch:  "Hard Masking 3-channel"
+  fusion_4ch:    "Fusi 4-Channel (Usulan)"
+colors:           # legenda gambar
+  baseline_3ch:  "gray"        # abu-abu
+  hardmask_3ch:  "pink"        # merah muda (pembanding)
+  fusion_4ch:    "mint"        # hijau mint (skema usulan)
+  model_output:  "lightyellow" # kuning muda (keluaran model)
+
+stages:
+  - id: 1
+    title: "Data dan Lung Mask"
+    boxes:
+      - {label: "Dataset CXR", notebooks: ["01_data_dedup_split"], modules: ["src/data/manifest.py", "src/data/dedup.py"]}
+      - {label: "U-Net Beku", notebooks: ["02_lung_mask_and_qc"], modules: ["src/segmentation/unet.py", "src/segmentation/lung_mask.py"]}
+      - {label: "Uji Kualitas mask", notebooks: ["02_lung_mask_and_qc"], modules: ["src/segmentation/qc.py"]}
+  - id: 2
+    title: "Prapemrosesan dan Split"
+    boxes:
+      - {label: "Prapemrosesan 224 x 224", notebooks: ["03_preprocess_sanity_check"], modules: ["src/data/transforms.py"]}
+      - {label: "Training 70% + augmentasi / Validation 15% / Testing 15%", notebooks: ["01_data_dedup_split"], modules: ["src/data/split.py", "src/data/dataset.py"]}
+  - id: 3
+    title: "Tiga Konfigurasi Masukan"
+    boxes:
+      - {label: "Baseline 3-channel",       notebooks: ["03_preprocess_sanity_check"], modules: ["src/data/input_schemes.py"]}
+      - {label: "Hard Masking 3-channel",   notebooks: ["03_preprocess_sanity_check"], modules: ["src/data/input_schemes.py"]}
+      - {label: "Fusi 4-Channel (Usulan)",  notebooks: ["03_preprocess_sanity_check"], modules: ["src/data/input_schemes.py", "src/models/fusion4ch.py"]}
+  - id: 4
+    title: "Pelatihan"
+    boxes:
+      - {label: "EfficientNet-B0 + AdamW, BCE, early stopping (patience 10) + 5 random seed", notebooks: ["04_train_all"], modules: ["src/train/trainer.py", "src/models/factory.py"]}
+      - {label: "Prediksi Normal / Pneumonia", notebooks: ["05_classification_eval"], modules: ["src/evaluation/classification_metrics.py"]}
+  - id: 5
+    title: "Evaluasi"
+    boxes:
+      - {label: "Klasifikasi (AUC-ROC, F1, akurasi, presisi, sensitivitas, spesifisitas, balanced accuracy, prediksi vs label asli)", notebooks: ["05_classification_eval"], modules: ["src/evaluation/classification_metrics.py"]}
+      - {label: "Grad-CAM (ACR, IoU-Paru)", notebooks: ["06_gradcam_localization"], modules: ["src/xai/gradcam.py", "src/xai/localization_metrics.py"]}
+      - {label: "Kelompok prediksi (TP, TN, FP, FN)", notebooks: ["06_gradcam_localization", "07_statistics_hypothesis"], modules: ["src/evaluation/aggregate.py"]}
+
+# Catatan urutan eksekusi nyata (SENGAJA beda dengan penomoran visual gambar; jangan "diperbaiki"):
+#   dedup -> split patient-wise (nb 01, hanya dari nama berkas) -> U-Net -> QC pada subset D_test (nb 02)
+#   -> prapemrosesan (nb 03) -> pelatihan (04) -> evaluasi (05-08).
+execution_order: ["00_setup_colab", "00b_dataset_inventory", "01_data_dedup_split", "01a_eda_kermany", "01b_eda_rsua",
+                  "02_lung_mask_and_qc", "03_preprocess_sanity_check", "04_train_all", "05_classification_eval",
+                  "06_gradcam_localization", "07_statistics_hypothesis", "08_figures_tables_for_thesis"]
+
+# AMBIG-15: notebook di luar kotak Gambar 3.1 (infrastruktur / EDA / keluaran skripsi); tidak dihitung sebagai tahap.
+infrastructure_notebooks:
+  - "00_setup_colab"
+  - "00b_dataset_inventory"
+  - "01a_eda_kermany"
+  - "01b_eda_rsua"
+  - "08_figures_tables_for_thesis"
+
+# Aturan panah merah gambar + validation 15%:
+red_arrow:
+  stage5_split: "test"
+  stage5_augment: false
+validation_use: ["early_stopping", "best_checkpoint_selection"]   # DILARANG untuk metrik tahap 5

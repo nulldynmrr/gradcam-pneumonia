@@ -1,0 +1,9 @@
+# HANYA lokal (Windows, CPU) untuk pengujian dengan data sintetis. TIDAK dipakai di Colab (Colab sudah punya torch).
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+# menjalankan notebook secara headless untuk bukti end-to-end DEBUG
+nbformat
+nbclient
+nbconvert
+ipykernel
