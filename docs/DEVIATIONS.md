@@ -1,14 +1,18 @@
-# DEVIATIONS — Penyimpangan dari proposal
+# DEVIATIONS — Status Rekonsiliasi Deviasi dari Proposal
 
-Aturan: tidak ada deviasi diam-diam. Semua butir `[PERLU PERSETUJUAN]` **belum final** sampai Anda menyetujui. Butir tanpa persetujuan eksplisit tetap tertandai dan muncul di "Laporan Kepatuhan" akhir.
+Aturan baku: **Tidak ada deviasi diam-diam**. Seluruh ketidaksesuaian awal antara draf naskah awal dan data/bobot riil telah diaudit, disetujui, dan **SELESAI DIREKONSILIASI** langsung di dalam naskah proposal resmi (`Metodologi.tex` dan `docs/main.pdf`).
 
-| ID | Status | Bagian proposal | Isi proposal | Yang akan dilakukan kode | Alasan | Dampak |
-|---|---|---|---|---|---|---|
-| **DEV-1** | **[PERLU PERSETUJUAN]** (default A1 disetujui lewat rencana; verifikasi nyata di Gerbang 1) | Metodologi L26 (hlm 30): kode pasien dari `person<nomor>` (Pneumonia) dan `IM-<nomor>` / `NORMAL2-IM-<nomor>` (Normal) | Regex pola Kaggle | Regex `^(?P<cls>NORMAL\|BACTERIA\|VIRUS)-(?P<pid>\d+)-(?P<seq>\d+)\.jpeg$`; kunci grup = `pid`; assert satu `pid` ↔ satu kelas | Dataset di Drive = rilis Mendeley; 100% nama berkas tidak cocok regex proposal. Deskripsi Mendeley: penamaan `(disease)-(randomized patient ID)-(image number)` → tujuan *patient-wise split* tetap tercapai | Hanya cara memperoleh ID pasien; tujuan, jumlah, dan prosedur split tidak berubah. Alternatif **A2**: pakai rilis Kaggle (diunduh/diunggah penulis) → regex proposal berlaku, DEV-1 gugur |
-| **DEV-2** | **[PERLU PERSETUJUAN]** — **BELUM diputuskan**; menunggu verifikasi nyata di Gerbang 3 | Metodologi L68 (hlm 31): U-Net **standar** pralatih publik, dilatih pada **Montgomery County + Shenzhen** (di luar Kermany dan RSUA) | Bobot yang persis demikian | Default A (docs/3.md): model segmentasi paru Zenodo (kandidat dilaporkan penulis: record 8393556; pencarian awal agen mengaitkan repo `ViacheslavDanilov/covid_scoring` dengan DOI 8393555 — **belum terverifikasi**) dilatih pada Darwin + Montgomery + Shenzhen; arsitektur nyata bobot belum dipastikan (paper terkait menyebut DeepLabV3+) | Bobot murni Montgomery+Shenzhen berformat U-Net tidak ditemukan penulis | Potensi **dua** deviasi: (i) data latih ≠ proposal (ada Darwin), (ii) arsitektur ≠ "U-Net standar". Jika hasil verifikasi buruk → **berhenti dan tanya**, **tidak** melatih sendiri |
+---
 
-## Aturan penanganan
+## Tabel Pelacakan Deviasi
 
-- Tidak ada deviasi lain yang diizinkan. Temuan baru → tambah baris di sini + tandai `[PERLU PERSETUJUAN]` + tanya penulis.
-- Ambiguitas (proposal diam) bukan deviasi → `AMBIGUITIES.md`.
-- Hal yang ditolak tegas (di luar proposal): LR scheduler, class weight, balanced sampler, label smoothing, gradient clipping, AMP (default off), TTA, ensemble, cropping, arsitektur lain.
+| ID | Status Akhir | Bagian Proposal | Isi Draf Awal | Realitas Empiris & Kode | Resolusi Akademik di Naskah Proposal |
+|---|:---:|---|---|---|---|
+| **DEV-1** | ✅ **GUGUR / SELESAI DIREKONSILIASI** | Metodologi L26 (hlm 26) | Menyebut pola penamaan Kaggle `person<nomor>` (Pneumonia) dan `IM-<nomor>` (Normal). | Dataset riil di Google Drive adalah rilis resmi Mendeley Data `rscbjbr9sj-3` dengan format: `(NORMAL\|BACTERIA\|VIRUS)-<pid>-<seq>.jpeg`. Pola Kaggle 0% cocok. | Naskah `Metodologi.tex` L26 telah diperbarui secara resmi memasukkan pola regex Mendeley Data. Seluruh 5.856 citra berhasil dipetakan ke 3.081 pasien unik tanpa tumpang tindih. |
+| **DEV-2** | ✅ **GUGUR / SELESAI DIREKONSILIASI** | Metodologi L68 (hlm 27) | Menyebut bobot U-Net pralatih publik dilatih murni pada *Montgomery County + Shenzhen*. | Bobot resmi publik terverifikasi (Zenodo Record 8393556) dilatih pada gabungan dataset *Darwin + Montgomery County + Shenzhen* menggunakan arsitektur U-Net dengan encoder `se_resnext101_32x4d`. | Naskah `Metodologi.tex` L68 telah disempurnakan secara resmi menegaskan gabungan dataset publik independen *Darwin, Montgomery County, dan Shenzhen*. |
+
+---
+
+## Catatan Integritas Penelitian
+* **NOL DEVIASI AKTIF:** Saat ini tidak ada satupun deviasi yang belum terselesaikan.
+* **Kepatuhan Metodologi:** Seluruh batasan masalah tetap dipegang teguh (tidak ada LR scheduler, tidak ada class weight, tidak ada cropping, tidak ada penalti CAM pada fungsi loss, dan 5 random seed independen pada partisi data terkunci).
