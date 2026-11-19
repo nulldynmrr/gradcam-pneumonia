@@ -1,33 +1,37 @@
-"""Skrip visualisasi kontur batas paru U-Net (overlay) pada citra rontgen CXR.
+"""Skrip ekspor overlay kontur batas paru U-Net & daftar 50 sampel uji Kermany (L3(2)).
 
-Menghasilkan citra overlay visualisasi batas kontur paru (hijau) di atas citra rontgen dada
-untuk verifikasi visual dokter / penulis skripsi mengacu pada Bab III (§3.2.2, L73).
+Mengacu pada Bab III (§3.2.2, L73) dan `docs/1.md` L3(2):
+- Memilih 50 citra dari `D_test` (25 Normal + 25 Pneumonia) dengan seed tetap dan menyimpan daftarnya
+  ke `data/interim/kermany_qc_50_list.csv`.
+- Mengekspor overlay kontur hijau U-Net ke `outputs/figures/lung_mask_overlays/` untuk inspeksi visual
+  serta membantu pembuatan kontur acuan manual penulis di `data/raw/kermany_manual_masks/`.
 """
 
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import Any, List
 
 import cv2
 import numpy as np
 import pandas as pd
 from PIL import Image
 
-from src.paths import ensure_output_dirs, get_project_paths, load_config
+from src.paths import ensure_output_dirs, load_config
 from src.segmentation.lung_mask import (
     binarize_probability_map,
     compute_r_paru,
     postprocess_lung_mask,
-    resize_mask_to_224,
 )
+from src.segmentation.qc import select_kermany_qc_subset
 from src.segmentation.unet import load_frozen_unet, predict_lung_probability
 
 
 def create_contour_overlay(
     image: np.ndarray | Image.Image,
     mask: np.ndarray,
-    color: tuple = (0, 255, 0),  # Hijau
+    color: tuple = (0, 255, 0),
     thickness: int = 2,
 ) -> np.ndarray:
     """Tumpuk garis kontur mask biner di atas citra grayscale CXR."""
@@ -35,15 +39,15 @@ def create_contour_overlay(
         im_arr = np.array(image.convert("RGB"))
     else:
         if image.ndim == 2:
+            if image.dtype != np.uint8:
+                image = (np.clip(image, 0.0, 1.0) * 255).astype(np.uint8)
             im_arr = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         else:
             im_arr = image.copy()
 
-    # Pastikan ukuran citra dan mask sama
     if im_arr.shape[:2] != mask.shape[:2]:
         mask = cv2.resize(mask, (im_arr.shape[1], im_arr.shape[0]), interpolation=cv2.INTER_NEAREST)
 
-    # Temukan kontur
     contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     overlay = im_arr.copy()
     cv2.drawContours(overlay, contours, -1, color, thickness)
@@ -51,60 +55,70 @@ def create_contour_overlay(
 
 
 def run_overlay_export(
-    n_samples_per_class: int = 10,
+    n_samples_per_class: int | None = None,
     output_dir: Path | None = None,
-) -> None:
-    """Jalankan ekstraksi kontur U-Net dan ekspor overlay untuk sampel data uji Kermany."""
+    unet_model: Any | None = None,
+    device: Any | None = None,
+    seed: int | None = None,
+) -> List[Path]:
+    """Jalankan ekstraksi kontur U-Net dan ekspor overlay untuk sampel D_test Kermany."""
     cfg = load_config()
     paths = ensure_output_dirs(cfg=cfg)
-    project_root = paths["project_root"]
+    lm_cfg = cfg["locked"]["lung_mask"]
 
+    if n_samples_per_class is None:
+        n_samples_per_class = int(lm_cfg["qc_kermany_normal"]["value"])
+    if seed is None:
+        seed = int(cfg["assumed"]["qc_kermany_selection_seed"]["value"])
     if output_dir is None:
-        output_dir = project_root / "outputs" / "figures" / "lung_mask_overlays"
+        output_dir = paths["outputs"] / "figures" / "lung_mask_overlays"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    weights_path = paths["unet_frozen"] / "weights.pth"
-    if not weights_path.exists():
-        print(f"[ERROR] Bobot U-Net tidak ditemukan di: {weights_path}")
-        print("Silakan unduh terlebih dahulu dengan: python scripts/download_unet_weights.py")
-        return
+    if unet_model is None:
+        weights_path = paths["unet_frozen"] / "weights.pth"
+        if not weights_path.exists():
+            raise FileNotFoundError(
+                f"Bobot U-Net tidak ditemukan di: {weights_path}. "
+                "Jalankan: python scripts/download_unet_weights.py"
+            )
+        unet_model = load_frozen_unet(weights_path, device=device)
 
-    print("Memuat model U-Net beku...")
-    model = load_frozen_unet(weights_path)
-
-    # Baca file split
     split_csv = paths["interim"] / "split_patientwise.csv"
     if not split_csv.exists():
-        print(f"[ERROR] Berkas split tidak ditemukan di: {split_csv}")
-        return
+        raise FileNotFoundError(f"Berkas split tidak ditemukan di: {split_csv}")
 
     split_df = pd.read_csv(split_csv)
-    test_df = split_df[split_df["split"] == "test"]
+    subset_csv = paths["interim"] / "kermany_qc_50_list.csv"
+    subset_df = select_kermany_qc_subset(
+        split_df, n_per_class=n_samples_per_class, seed=seed, out_csv=subset_csv
+    )
 
     kermany_root = paths["kermany_chest_xray"]
-    print(f"Mengekspor {n_samples_per_class} citra per kelas ke {output_dir}...")
+    bin_thr = float(lm_cfg["binarize_threshold"]["value"])
+    keep_comp = int(lm_cfg["keep_largest_components"]["value"])
+    fill_holes = bool(lm_cfg["hole_filling"]["value"])
 
-    for label in ["Normal", "Pneumonia"]:
-        sub = test_df[test_df["label"] == label].sample(n=min(n_samples_per_class, len(test_df[test_df["label"] == label])), random_state=42)
-        for _, row in sub.iterrows():
-            img_p = kermany_root / row["rel_path"]
-            with Image.open(img_p) as im:
-                prob = predict_lung_probability(model, im, return_original_size=True)
-                bin_mask = binarize_probability_map(prob, threshold=0.5)
-                clean_mask = postprocess_lung_mask(bin_mask, keep_components=2, fill_holes=True)
-                r_paru = compute_r_paru(clean_mask)
+    saved_paths: List[Path] = []
+    for _, row in subset_df.iterrows():
+        img_p = kermany_root / row["rel_path"]
+        with Image.open(img_p) as im:
+            prob = predict_lung_probability(unet_model, im, device=device, return_original_size=True)
+            bin_mask = binarize_probability_map(prob, threshold=bin_thr)
+            clean_mask = postprocess_lung_mask(bin_mask, keep_components=keep_comp, fill_holes=fill_holes)
+            r_paru = compute_r_paru(clean_mask)
 
-                overlay = create_contour_overlay(im, clean_mask, color=(0, 255, 0), thickness=2)
+            overlay = create_contour_overlay(im, clean_mask, color=(0, 255, 0), thickness=2)
+            out_path = output_dir / f"{row['label']}_{row['image_id']}_r{r_paru:.3f}.png"
+            cv2.imwrite(str(out_path), cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
+            saved_paths.append(out_path)
 
-                # Simpan citra overlay
-                out_name = f"{label}_{row['image_id']}_r{r_paru:.3f}.png"
-                cv2.imwrite(str(output_dir / out_name), cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
-
-    print(f"[OK] Seluruh citra visualisasi overlay kontur paru berhasil diekspor ke: {output_dir}")
+    print(f"[OK] {len(saved_paths)} citra overlay kontur paru diekspor ke: {output_dir}")
+    print(f"[OK] Daftar subset terkunci tersimpan di: {subset_csv}")
+    return saved_paths
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Ekspor overlay kontur batas paru U-Net")
-    parser.add_argument("--n", type=int, default=10, help="Jumlah sampel visualisasi per kelas")
+    parser = argparse.ArgumentParser(description="Ekspor overlay kontur batas paru U-Net (50 sampel D_test)")
+    parser.add_argument("--n", type=int, default=25, help="Jumlah sampel visualisasi per kelas (default: 25)")
     args = parser.parse_args()
     run_overlay_export(n_samples_per_class=args.n)

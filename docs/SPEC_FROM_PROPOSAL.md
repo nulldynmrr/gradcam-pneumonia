@@ -15,27 +15,27 @@ Kolom **Mengacu pada proposal**: ✔ = sama persis dengan teks · ⚠ = ada ambi
 | D2 | Dedup citra identik (hash byte DAN hash piksel) SEBELUM split; simpan log | Metodologi L24 (hlm 30); Gambar 3.1 | ⚠ AMBIG-2 | `src/data/dedup.py::find_duplicates`; `data/interim/dedup_log.csv` | `test_dedup` | G2 | [x] |
 | D3 | ID pasien via regex dari nama berkas | Metodologi L26 (hlm 30) | ✖ DEV-1 (nama berkas Mendeley ≠ pola proposal) | `src/data/manifest.py::extract_patient_id` (regex di `config.assumed.patient_id_regex`) | `test_patient_regex` | G1/G2 | [x] |
 | D4 | Stratified group split 70/15/15 (kelas × pasien), tanpa irisan, dikunci untuk semua konfigurasi & seed; laporkan jumlah citra & pasien unik vs Tabel 3.1 | Metodologi L28–36; Tabel 3.1 (hlm 30–31) | ⚠ AMBIG-3 | `src/data/split.py::patientwise_split`; `data/interim/split_patientwise.csv` (+hash) | `test_split_no_leakage`, `test_split_locked_hash` | G2 | [x] |
-| D5 | Grayscale 1-ch, skala [0,1] sebelum normalisasi | Metodologi L81 (hlm 33) | ✔ | `src/data/transforms.py::load_gray01` | `test_gray01_range` | G3 | [ ] |
+| D5 | Grayscale 1-ch, skala [0,1] sebelum normalisasi | Metodologi L81 (hlm 33) | ✔ | `src/data/transforms.py::load_gray01` | `test_load_gray01_and_resize_pair_from_config` | G3 | [x] |
 
 ## B. Lung mask
 
 | ID | Spesifikasi | Proposal | Mengacu | Implementasi | Test | G | Cek |
 |---|---|---|---|---|---|---|---|
-| L1 | U-Net standar pralatih PUBLIK (Montgomery+Shenzhen, bukan Kermany/RSUA), bobot beku; bobot harus terverifikasi, kalau tidak ada: berhenti & tanya | Metodologi L68 (hlm 31); Pendahuluan L56 | ⚠/✖ DEV-2, AMBIG | `src/segmentation/unet.py::load_frozen_unet` | `test_unet_frozen_no_grad` | G3 | [ ] |
-| L2 | prob → biner thr 0,5 → 2 komponen terbesar kiri-kanan → hole filling; (default) prob di-resize ke ukuran asli sebelum thr | Metodologi L77 (hlm 32) | ⚠ AMBIG-1 | `src/segmentation/lung_mask.py::postprocess` | `test_postprocess_two_components`, `test_mask_binary` | G3 | [ ] |
-| L3 | QC sebelum training tanpa melihat keluaran klasifikator: (1) RSUA 85 (53 P + 32 N; 207 COVID dikeluarkan) vs GT 256×256; (2) 50 citra D_test Kermany (25+25, seed tetap, daftar disimpan) vs kontur manual `data/raw/kermany_manual_masks/*.png` | Metodologi L71–73 (hlm 31–32) | ✔ | `src/segmentation/qc.py`; `scripts/export_overlay_for_manual_masks.py`, `import_manual_masks.py` | `test_qc_dice_iou`, `test_qc_selection_balanced` | G3 | [ ] |
-| L4 | Kriteria rata-rata DSC ≥ 0,85 dan IoU ≥ 0,75 PER KELAS; PASS/FAIL; tidak memblokir, tidak melatih ulang; FAIL → `ACKNOWLEDGE_QC_FAIL=True` wajib sebelum nb 04 | Metodologi L14, L73 (hlm 29, 32) | ✔ | `qc.py::qc_report`; guard di nb 04 | `test_qc_fail_requires_ack` | G3 | [ ] |
-| L5 | `r_paru=(1/HW)ΣM`; bandingkan rata-rata N vs P; \|Δ\|>0,05 → ACR_norm jadi metrik pembanding; hitung `r_paru<0,05` per kelas + sensitivitas (dengan/tanpa) | Metodologi L73, L77, L251 (hlm 32, 40) | ⚠ AMBIG-14 | `lung_mask.py::r_paru`, nb `01b`/`02` | `test_r_paru_formula` | G3 | [ ] |
+| L1 | U-Net standar pralatih PUBLIK (Darwin+Montgomery+Shenzhen, bukan Kermany/RSUA), bobot beku; bobot harus terverifikasi | Metodologi L68 (hlm 27); Pendahuluan L56 | ✔ *(DEV-2 direkonsiliasi di `.tex`)* | `src/segmentation/unet.py::load_frozen_unet`, `get_unet_spec` | `test_unet_spec_verified_fields`, `test_create_unet_architecture_parameters` | G3 | [~] |
+| L2 | prob → biner thr 0,5 → 2 komponen terbesar kiri-kanan → hole filling; (default) prob di-resize ke ukuran asli sebelum thr | Metodologi L77 (hlm 28) | ⚠ AMBIG-1 | `src/segmentation/lung_mask.py::postprocess_lung_mask` | `test_lung_mask.py` | G3 | [x] |
+| L3 | QC sebelum training tanpa melihat keluaran klasifikator: (1) RSUA 85 (53 P + 32 N; 207 COVID dikeluarkan) vs GT 256×256; (2) 50 citra D_test Kermany (25+25, seed tetap, daftar disimpan) vs kontur manual `data/raw/kermany_manual_masks/*.png` | Metodologi L71–73 (hlm 28) | ✔ | `src/segmentation/qc.py`; `scripts/export_overlay_for_manual_masks.py`, `import_manual_masks.py` | `test_qc_metrics.py`, `test_gerbang3_pipeline.py` | G3 | [~] |
+| L4 | Kriteria rata-rata DSC ≥ 0,85 dan IoU ≥ 0,75 PER KELAS; PASS/FAIL; tidak memblokir, tidak melatih ulang; FAIL → `ACKNOWLEDGE_QC_FAIL=True` wajib sebelum nb 04 | Metodologi L14, L73 (hlm 25, 28) | ✔ | `qc.py::evaluate_rsua_dataset`, `evaluate_kermany_manual_masks`; nb `02` GATE CHECK | `test_gerbang3_pipeline.py` | G3 | [~] |
+| L5 | `r_paru=(1/HW)ΣM`; bandingkan rata-rata N vs P; \|Δ\|>0,05 → ACR_norm jadi metrik pembanding; hitung `r_paru<0,05` per kelas + sensitivitas (dengan/tanpa) | Metodologi L73, L77, L251 (hlm 28, 35) | ⚠ AMBIG-14 | `lung_mask.py::compute_r_paru`, `qc.py::summarize_full_r_paru`, nb `02` | `test_lung_mask.py`, `test_gerbang3_pipeline.py` | G3 | [~] |
 
 ## C. Prapemrosesan & skema masukan
 
 | ID | Spesifikasi | Proposal | Mengacu | Implementasi | Test | G | Cek |
 |---|---|---|---|---|---|---|---|
-| P1 | citra → 224×224 bilinear; mask → 224×224 NEAREST | Metodologi L79 (hlm 32), L83 | ⚠ AMBIG-4 (metode citra tak disebut di L79) | `transforms.py::resize_pair` | `test_mask_binary_after_resize` | G3 | [ ] |
-| P2 | Baseline 3-ch: gray×3 → normalisasi ImageNet | Metodologi L81 (hlm 33) | ✔ | `input_schemes.py::baseline_3ch` | `test_scheme_baseline` | G3 | [ ] |
-| P3 | Hard masking: I224 ⊙ M224 DULU (skala [0,1]) → gray×3 → normalisasi ImageNet | Metodologi L81, L111 | ✔ | `input_schemes.py::hardmask_3ch` | `test_hardmask_before_norm` | G3 | [ ] |
-| P4 | Fusi 4-ch: [X_RGB(ternormalisasi) ‖ M224 biner {0,1}], ch-4 TIDAK dinormalisasi | Metodologi L81, L113 (hlm 33, 36) | ✔ | `input_schemes.py::fusion_4ch` | `test_ch4_not_normalized` | G3 | [ ] |
-| P5 | Augmentasi HANYA train: rot ±15°, hflip 0,5, translasi ≤10%, zoom 0,9–1,1; parameter acak identik untuk (I224,M224); bilinear/nearest; fill 0; urutan: aug pasangan → ⊙ → normalisasi → concat | Metodologi L83 (hlm 33) | ✔ | `transforms.py::PairAugment` | `test_aug_pair_identical`, `test_mask_binary_after_aug`, `test_val_test_no_aug` | G3 | [ ] |
+| P1 | citra → 224×224 bilinear; mask → 224×224 NEAREST | Metodologi L79 (hlm 28), L83 | ✔ *(AMBIG-4 eksplisit di L83 & Alg. 1)* | `transforms.py::resize_pair`, `cache.py` | `test_load_gray01_and_resize_pair_from_config`, `test_synthetic_end_to_end_cache_qc_and_plots` | G3 | [x] |
+| P2 | Baseline 3-ch: gray×3 → normalisasi ImageNet | Metodologi L81 (hlm 29) | ✔ | `input_schemes.py::build_baseline_3ch` | `test_input_schemes.py` | G3 | [x] |
+| P3 | Hard masking: I224 ⊙ M224 DULU (skala [0,1]) → gray×3 → normalisasi ImageNet | Metodologi L81, L111 | ✔ | `input_schemes.py::build_hardmask_3ch` | `test_input_schemes.py` | G3 | [x] |
+| P4 | Fusi 4-ch: [X_RGB(ternormalisasi) ‖ M224 biner {0,1}], ch-4 TIDAK dinormalisasi | Metodologi L81, L113 (hlm 29, 30) | ✔ | `input_schemes.py::build_fusion_4ch` | `test_input_schemes.py` | G3 | [x] |
+| P5 | Augmentasi HANYA train: rot ±15°, hflip 0,5, translasi ≤10%, zoom 0,9–1,1; parameter acak identik untuk (I224,M224); bilinear/nearest; fill 0; urutan: aug pasangan → ⊙ → normalisasi → concat | Metodologi L83 (hlm 29) | ✔ | `transforms.py::PairwiseAffineTransform` | `test_input_schemes.py`, `test_gerbang3_pipeline.py` | G3 | [x] |
 
 ## D. Model & pelatihan
 

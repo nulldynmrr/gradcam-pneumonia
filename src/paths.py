@@ -110,8 +110,13 @@ def ensure_output_dirs(project_root: Path | None = None, cfg: dict | None = None
         "stats",
         "figures",
         "figures/eda",
+        "figures/qc",
+        "figures/preprocess",
+        "figures/lung_mask_overlays",
         "tables",
         "tables/eda",
+        "tables/qc",
+        "tables/preprocess",
     ):
         (paths["outputs"] / sub).mkdir(parents=True, exist_ok=True)
     return paths

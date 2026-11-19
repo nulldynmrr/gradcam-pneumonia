@@ -1,17 +1,19 @@
-# THIRD_PARTY — Sumber eksternal, lisensi, dan status verifikasi
+# THIRD_PARTY — Sumber Eksternal, Lisensi, dan Status Verifikasi
 
-Aturan: dilarang mengarang link/bobot/angka/sitasi; setiap sumber diverifikasi lewat sumber primer; menyalin kode memerlukan pencatatan sumber + lisensi di sini. Repo referensi = pembanding read-only.
+Aturan: dilarang mengarang tautan, bobot, angka, atau sitasi; setiap sumber diverifikasi melalui API/halaman primer; menyalin kode memerlukan pencatatan sumber + lisensi di sini. Repo referensi bersifat pembanding *read-only*.
 
-| Sumber | Peran | Digunakan sebagai | Lisensi | Status verifikasi |
+| Sumber & URL Asli | Peran | Digunakan Sebagai | Lisensi Terverifikasi | Status Verifikasi |
 |---|---|---|---|---|
-| `timm` (huggingface/pytorch-image-models) | arsitektur EfficientNet-B0 + bobot ImageNet | dependensi (di-pin) | Apache-2.0 *(diverifikasi saat instal: cek metadata paket)* | Belum diperiksa — G4 |
-| `torch`, `torchvision` | framework | dependensi (bawaan Colab; lokal CPU) | BSD-style *(verifikasi saat instal)* | Belum diperiksa — G4 |
-| scikit-learn, SciPy, pandas, pyarrow, OpenCV (headless), Matplotlib, PyYAML, pytest, tqdm | analisis/uji | dependensi (di-pin) | — | Dicatat saat `pip freeze` — G1 |
-| Kermany pediatric CXR, rilis **Mendeley** `rscbjbr9sj` (ID di nama folder lokal `rscbjbr9sj-3`) | data utama | data (read-only) | **Belum diverifikasi** (cek lisensi pada halaman Mendeley) | Struktur nyata dicatat di `DATA_CONTRACT.md` (G1) |
-| RSUA Chest X-Ray dataset (Wahyuningrum dkk., Data in Brief 2023; Mendeley `10.17632/2jg8vfdmpm.1` per docs/3.md) | QC lung mask | data (read-only) | **Belum diverifikasi** | G1 |
-| Bobot U-Net / model segmentasi paru (kandidat: Zenodo, repo `ViacheslavDanilov/covid_scoring`) | lung mask beku | bobot (read-only) | **Belum diverifikasi** | G3 — **wajib** diverifikasi: DOI/URL, versi, lisensi, arsitektur nyata, data latih, format masukan, ukuran + checksum |
-| Dataset gabungan Mendeley `8gf9vpkhgy` (kandidat docs/3.md) | alternatif sumber segmentasi | – | **Belum diverifikasi** | G3 |
-| `jacobgil/pytorch-grad-cam` (pip `grad-cam`) | **hanya** cross-check Grad-CAM (G4); bukan hasil akhir | verifikasi | MIT *(verifikasi saat instal)* | G4 |
-| Selvaraju dkk. 2017 (Grad-CAM) | rumus Pers. 2.5–2.6 | implementasi sendiri dari makalah | – | tidak menyalin kode |
+| `huggingface/pytorch-image-models` (`timm`) — https://github.com/huggingface/pytorch-image-models | Arsitektur EfficientNet-B0 + bobot pralatih ImageNet (`timm/efficientnet_b0.ra_in1k`: https://huggingface.co/timm/efficientnet_b0.ra_in1k) | Dependensi (`timm==1.0.31`) | **Apache-2.0** (kode & card `efficientnet_b0.ra_in1k`) | ✅ Terverifikasi via GitHub & Hugging Face API (19 Nov 2026) |
+| `qubvel-org/segmentation_models.pytorch` (`smp`) — https://github.com/qubvel-org/segmentation_models.pytorch | Framework arsitektur `smp.Unet` untuk memuat bobot U-Net Zenodo | Dependensi (`segmentation-models-pytorch==0.6.0`) | **MIT** | ✅ Terverifikasi via GitHub API (19 Nov 2026) |
+| Zenodo Record 8393556 (*Deep Learning Models for Lung Segmentation in Chest X-ray Radiographs*) — https://zenodo.org/records/8393556 | Bobot U-Net beku (`Unet.zip`, 208.426.482 byte, MD5 `9ddfcf1d5cf1927dd095b7ca333c6350`; dilatih pada Darwin + Montgomery + Shenzhen) | Bobot pralatih beku (*read-only*) | **CC-BY-4.0** | ✅ Terverifikasi via Zenodo API (19 Nov 2026) |
+| `ViacheslavDanilov/covid_scoring` — https://github.com/ViacheslavDanilov/covid_scoring | Repo pendamping resmi bobot Zenodo 8393556 (`inference.py` L95–L103 mengonfirmasi `Unet`, `se_resnext101_32x4d`, input `384x384`, 3-ch, normalisasi ImageNet, aktivasi `sigmoid`, threshold `0.5`) | Rujukan *read-only* format masukan | **MIT** | ✅ Terverifikasi via GitHub API & `raw/master/inference.py` (19 Nov 2026) |
+| `jacobgil/pytorch-grad-cam` — https://github.com/jacobgil/pytorch-grad-cam | **Hanya** *cross-check* Grad-CAM pada Gerbang 4 (bukan implementasi hasil akhir) | Verifikasi (G4) | **MIT** | ✅ Terverifikasi via GitHub API (19 Nov 2026) |
+| `ianpan/chest-x-ray-basic` — https://huggingface.co/ianpan/chest-x-ray-basic & `ianpan/pneumonia-cxr` — https://huggingface.co/ianpan/pneumonia-cxr | Referensi arsitektur CXR multi-task / U-Net EfficientNet di Hugging Face (TIDAK dipakai sebagai bobot eksperimen karena dilatih di CheXpert/NIH/CheXmask dan tanpa lisensi eksplisit) | Pembanding literatur/kode *read-only* | **Tidak dinyatakan eksplisit** (`None` pada model card) | ✅ Terverifikasi via Hugging Face API (19 Nov 2026) |
+| `ngaggion/Chest-x-ray-HybridGNet-Segmentation` — https://huggingface.co/spaces/ngaggion/Chest-x-ray-HybridGNet-Segmentation | Referensi demo segmentasi paru CXR (CheXmask / HybridGNet) | Pembanding *read-only* | **GPL-3.0** | ✅ Terverifikasi via Hugging Face API (19 Nov 2026) |
+| `torch`, `torchvision`, `scikit-learn`, `scipy`, `pandas`, `opencv-python-headless`, `matplotlib`, `pyyaml`, `pytest`, `tqdm` | Framework & pustaka komputasi/analisis | Dependensi | BSD / MIT / PSF | Versi dicatat otomatis via `src/seed.py::get_env_snapshot()` |
+| Kermany pediatric CXR, rilis Mendeley `rscbjbr9sj-3` | Dataset utama eksperimen | Data (*read-only*) | CC-BY-4.0 (Mendeley Data) | Terverifikasi di Gerbang 1 (`DATA_CONTRACT.md`) |
+| RSUA Chest X-Ray Dataset (Wahyuningrum dkk., *Data in Brief* 2023; Mendeley `10.17632/2jg8vfdmpm.1`) | Dataset QC segmentasi paru (85 citra: 32 Normal, 53 Pneumonia; 207 COVID-19 dikeluarkan) | Data (*read-only*) | CC-BY-4.0 (Mendeley Data) | Terverifikasi di Gerbang 1 (`DATA_CONTRACT.md`) |
+| Selvaraju dkk. 2017 (Grad-CAM) | Rumus Pers. 2.5–2.6 | Implementasi sendiri dari makalah | — | Tidak menyalin kode |
 
-Catatan: tidak ada kode pihak ketiga yang disalin ke repo hingga saat ini.
+Catatan: Tidak ada kode pihak ketiga yang disalin langsung ke repositori ini.
