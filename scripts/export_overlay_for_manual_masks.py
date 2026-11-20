@@ -60,6 +60,7 @@ def run_overlay_export(
     unet_model: Any | None = None,
     device: Any | None = None,
     seed: int | None = None,
+    image_root: Path | None = None,
 ) -> List[Path]:
     """Jalankan ekstraksi kontur U-Net dan ekspor overlay untuk sampel D_test Kermany."""
     cfg = load_config()
@@ -93,7 +94,14 @@ def run_overlay_export(
         split_df, n_per_class=n_samples_per_class, seed=seed, out_csv=subset_csv
     )
 
-    kermany_root = paths["kermany_chest_xray"]
+    if image_root is not None:
+        kermany_root = Path(image_root)
+    else:
+        first_rel = str(subset_df["rel_path"].iloc[0])
+        if (paths["harmonized_png"] / first_rel).exists():
+            kermany_root = paths["harmonized_png"]
+        else:
+            kermany_root = paths["kermany_chest_xray"]
     bin_thr = float(lm_cfg["binarize_threshold"]["value"])
     keep_comp = int(lm_cfg["keep_largest_components"]["value"])
     fill_holes = bool(lm_cfg["hole_filling"]["value"])

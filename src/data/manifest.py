@@ -211,3 +211,73 @@ def build_multisource_manifest(
         "harmonized_root": str(harmonized_dir) if convert_to_png else "",
     }
     return combined, audit
+
+
+def ensure_harmonized_images_for_split(
+    split_df: pd.DataFrame,
+    kermany_root: Path,
+    rsna_root: Path,
+    harmonized_dir: Path,
+    num_workers: int = 8,
+    show_progress: bool = True,
+) -> Path:
+    """Pastikan seluruh citra pada `split_df` tersedia sebagai PNG lossless di `harmonized_dir`.
+
+    Berguna saat berpindah ke runtime Colab GPU baru (SSD lokal `/content/work/harmonized_png` kosong):
+    hanya mengekstrak & mengonversi citra yang tercatat di `split_patientwise.csv` secara paralel.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    from tqdm.auto import tqdm
+    from src.data.rsna_loader import convert_dicom_to_lossless_png
+
+    harmonized_dir = Path(harmonized_dir)
+    harmonized_dir.mkdir(parents=True, exist_ok=True)
+
+    missing_rows = [
+        row for _, row in split_df.iterrows() if not (harmonized_dir / str(row["rel_path"])).exists()
+    ]
+    if not missing_rows:
+        return harmonized_dir
+
+    # Indeks path berkas Kermany berdasarkan stem agar lookup O(1)
+    kerm_lookup: Dict[str, Path] = {}
+    if any(str(r.get("source", "kermany")).lower() == "kermany" for r in missing_rows):
+        for p in Path(kermany_root).rglob("*"):
+            if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS:
+                kerm_lookup[p.stem] = p
+
+    dcm_dir = Path(rsna_root) / "stage_2_train_images"
+
+    def _convert_one(row: pd.Series) -> None:
+        dst = harmonized_dir / str(row["rel_path"])
+        if dst.exists():
+            return
+        src_name = str(row.get("source", "kermany")).lower()
+        if src_name == "rsna":
+            pid = str(row["patient_id"])
+            dcm_path = dcm_dir / f"{pid}.dcm"
+            if not dcm_path.exists():
+                raise FileNotFoundError(f"Berkas DICOM RSNA tidak ditemukan: {dcm_path}")
+            convert_dicom_to_lossless_png(dcm_path, dst)
+        else:
+            img_id = str(row["image_id"])
+            src_path = kerm_lookup.get(img_id)
+            if src_path is None:
+                raise FileNotFoundError(f"Berkas citra Kermany tidak ditemukan untuk image_id={img_id}")
+            harmonize_image_to_lossless_png(src_path, dst)
+
+    if num_workers > 1 and len(missing_rows) > 16:
+        with ThreadPoolExecutor(max_workers=num_workers) as pool:
+            it = pool.map(_convert_one, missing_rows)
+            if show_progress:
+                it = tqdm(it, total=len(missing_rows), desc="Menyiapkan PNG split di SSD lokal")
+            for _ in it:
+                pass
+    else:
+        it = (_convert_one(r) for r in missing_rows)
+        if show_progress:
+            it = tqdm(it, total=len(missing_rows), desc="Menyiapkan PNG split di SSD lokal")
+        for _ in it:
+            pass
+
+    return harmonized_dir
