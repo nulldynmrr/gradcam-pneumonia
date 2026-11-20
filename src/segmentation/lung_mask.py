@@ -114,3 +114,64 @@ def check_class_lung_ratio_diff(
     diff = abs(mean_r_normal - mean_r_pneumonia)
     triggers_ac_norm = diff > threshold
     return triggers_ac_norm, float(diff)
+
+
+def compute_lr_lung_balance(
+    mask: np.ndarray,
+    min_lr_ratio: float = 0.30,
+) -> dict:
+    """Hitung keseimbangan luas paru kiri vs kanan untuk QC kegagalan segmentasi satu sisi.
+
+    Mengacu pada Proposal Bab III (§3.2.2):
+    - Menghitung komponen terhubung yang bermakna pada mask biner.
+    - Bila terdapat >= 2 komponen, dua komponen terbesar dipetakan ke kiri/kanan berdasarkan
+      posisi rata-rata sumbu X. Bila hanya 1 komponen (atau 0), luas dibagi terhadap garis tengah
+      horizontal citra sebagai perkiraan sisi kiri dan kanan.
+    - Menandai `lr_imbalance_flag = True` apabila rasio `r_LR = min(A_L, A_R) / max(A_L, A_R) < min_lr_ratio`
+      atau jumlah komponen valid < 2.
+    """
+    assert mask.ndim == 2, "Mask harus 2 dimensi"
+    bin_mask = (mask > 0).astype(np.uint8)
+    total_area = int(bin_mask.sum())
+    if total_area == 0:
+        return {
+            "left_area": 0,
+            "right_area": 0,
+            "lr_ratio": 0.0,
+            "n_components": 0,
+            "lr_imbalance_flag": True,
+        }
+
+    labeled, num_features = label(bin_mask)
+    comp_sizes = np.bincount(labeled.ravel())
+    comp_sizes[0] = 0
+    # Komponen bermakna: >= 1% dari total luas paru terdeteksi (abaikan noise titik kecil)
+    min_comp_px = max(1, int(0.01 * total_area))
+    valid_labels = [int(i) for i in range(1, len(comp_sizes)) if comp_sizes[i] >= min_comp_px]
+    n_valid = len(valid_labels)
+
+    if n_valid >= 2:
+        top2 = sorted(valid_labels, key=lambda idx: int(comp_sizes[idx]), reverse=True)[:2]
+        centroids_x = []
+        for lbl_id in top2:
+            xs = np.where(labeled == lbl_id)[1]
+            centroids_x.append((float(xs.mean()), int(comp_sizes[lbl_id])))
+        centroids_x.sort(key=lambda t: t[0])
+        left_area = centroids_x[0][1]
+        right_area = centroids_x[1][1]
+    else:
+        mid_x = bin_mask.shape[1] // 2
+        left_area = int(bin_mask[:, :mid_x].sum())
+        right_area = int(bin_mask[:, mid_x:].sum())
+
+    denom = max(left_area, right_area)
+    lr_ratio = float(min(left_area, right_area) / denom) if denom > 0 else 0.0
+    flag = (lr_ratio < float(min_lr_ratio)) or (n_valid < 2)
+
+    return {
+        "left_area": int(left_area),
+        "right_area": int(right_area),
+        "lr_ratio": lr_ratio,
+        "n_components": int(n_valid),
+        "lr_imbalance_flag": bool(flag),
+    }

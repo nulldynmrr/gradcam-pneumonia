@@ -69,6 +69,7 @@ def get_project_paths(project_root: Path | None = None, cfg: dict | None = None)
 
     rel = cfg.get("runtime", {}).get("rel_paths", {})
     kermany_rel = rel.get("kermany_raw", "data/raw/kermany/chest_xray")
+    rsna_rel = rel.get("rsna_raw", "data/raw/rsna")
     rsua_val_rel = rel.get(
         "rsua_validated",
         "data/raw/rsua/Data Chest X-Ray RSUA (Validated)-20230618T025557Z-001/Data Chest X-Ray RSUA (Validated)",
@@ -76,6 +77,7 @@ def get_project_paths(project_root: Path | None = None, cfg: dict | None = None)
     manual_rel = rel.get("kermany_manual_masks", "data/raw/kermany_manual_masks")
     seg_pub_rel = rel.get("seg_public", "data/raw/seg_public")
     interim_rel = rel.get("interim", "data/interim")
+    harmonized_rel = rel.get("harmonized_png", "data/interim/harmonized_png")
     processed_rel = rel.get("processed", "data/processed")
     unet_rel = rel.get("unet_weights_dir", "models/unet_frozen")
     outputs_rel = rel.get("outputs", "outputs")
@@ -85,11 +87,13 @@ def get_project_paths(project_root: Path | None = None, cfg: dict | None = None)
         "data_raw": project_root / "data" / "raw",
         "kermany_root": project_root / "data" / "raw" / "kermany",
         "kermany_chest_xray": project_root / kermany_rel,
+        "rsna_raw": project_root / rsna_rel,
         "rsua_root": project_root / "data" / "raw" / "rsua",
         "rsua_validated": project_root / rsua_val_rel,
         "kermany_manual_masks": project_root / manual_rel,
         "seg_public": project_root / seg_pub_rel,
         "interim": project_root / interim_rel,
+        "harmonized_png": project_root / harmonized_rel,
         "processed": project_root / processed_rel,
         "unet_frozen": project_root / unet_rel,
         "outputs": project_root / outputs_rel,
@@ -99,7 +103,7 @@ def get_project_paths(project_root: Path | None = None, cfg: dict | None = None)
 def ensure_output_dirs(project_root: Path | None = None, cfg: dict | None = None) -> Dict[str, Path]:
     """Buat seluruh direktori keluaran/interim (TIDAK menyentuh `data/raw` karena read-only)."""
     paths = get_project_paths(project_root, cfg)
-    for key in ("interim", "processed", "unet_frozen", "outputs"):
+    for key in ("interim", "harmonized_png", "processed", "unet_frozen", "outputs"):
         paths[key].mkdir(parents=True, exist_ok=True)
     for sub in (
         "checkpoints",
@@ -112,11 +116,13 @@ def ensure_output_dirs(project_root: Path | None = None, cfg: dict | None = None
         "figures/eda",
         "figures/qc",
         "figures/preprocess",
+        "figures/audit",
         "figures/lung_mask_overlays",
         "tables",
         "tables/eda",
         "tables/qc",
         "tables/preprocess",
+        "tables/audit",
     ):
         (paths["outputs"] / sub).mkdir(parents=True, exist_ok=True)
     return paths

@@ -57,6 +57,7 @@ infrastructure_notebooks:
   - "00b_dataset_inventory"
   - "01a_eda_kermany"
   - "01b_eda_rsua"
+  - "02b_shortcut_audit"
   - "08_figures_tables_for_thesis"
 
 # Aturan panah merah gambar + validation 15%:

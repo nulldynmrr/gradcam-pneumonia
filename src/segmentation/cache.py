@@ -5,7 +5,7 @@ Mengacu pada:
   hasilnya di-cache di `data/processed/`.
 - `docs/1.md` baris 103 & AMBIG-17: cache `I_224` sebagai `float32` [0,1] (tanpa galat kuantisasi uint8)
   dan `M_224` sebagai `uint8` biner murni `{0, 1}`.
-- Verifikasi integritas split: memeriksa checksum SHA-256 `split_patientwise.csv` sebelum berjalan.
+- Mendukung dataset multi-sumber (Kermany + RSNA) serta mencatat QC keseimbangan paru kiri/kanan (`r_LR`).
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from src.data.split import verify_locked_split
 from src.data.transforms import load_gray01, resize_image_to_224
 from src.segmentation.lung_mask import (
     binarize_probability_map,
+    compute_lr_lung_balance,
     compute_r_paru,
     postprocess_lung_mask,
     resize_mask_to_224,
@@ -39,6 +40,7 @@ class PreprocessCacheConfig:
     keep_largest_components: int
     hole_filling: bool
     r_paru_extreme_threshold: float
+    lr_balance_min_ratio: float = 0.30
 
     @classmethod
     def from_yaml_cfg(cls, cfg: dict) -> "PreprocessCacheConfig":
@@ -50,6 +52,7 @@ class PreprocessCacheConfig:
             keep_largest_components=int(lm["keep_largest_components"]["value"]),
             hole_filling=bool(lm["hole_filling"]["value"]),
             r_paru_extreme_threshold=float(lm["r_paru_extreme_threshold"]["value"]),
+            lr_balance_min_ratio=float(lm.get("lr_balance_min_ratio", {}).get("value", 0.30)),
         )
 
 
@@ -64,12 +67,11 @@ def run_full_lung_mask_cache(
     max_samples: int | None = None,
     show_progress: bool = True,
 ) -> pd.DataFrame:
-    """Jalankan inferensi U-Net beku & resize 224x224 secara resumable untuk seluruh citra Kermany.
+    """Jalankan inferensi U-Net beku & resize 224x224 secara resumable untuk seluruh citra.
 
-    Menyimpan per citra:
-    - `processed_dir/images_224/<image_id>.npy` : `float32` (224, 224) rentang [0.0, 1.0] (bilinear)
-    - `processed_dir/masks_224/<image_id>.npy`  : `uint8` (224, 224) nilai `{0, 1}` (nearest)
-    - `processed_dir/lung_mask_metadata.csv`    : tabel metadata & `r_paru` lengkap seluruh citra.
+    Catatan parameter `kermany_root`: dipertahankan namanya demi kompatibilitas mundur, namun dapat
+    diisi direktori akar mana pun yang menjadi basis `rel_path` (misal `data/interim/harmonized_png/`
+    untuk dataset gabungan Kermany + RSNA).
     """
     if verify_split_checksum:
         verify_locked_split(split_csv_path)
@@ -102,13 +104,12 @@ def run_full_lung_mask_cache(
         img_npy = img_out_dir / f"{image_id}.npy"
         mask_npy = mask_out_dir / f"{image_id}.npy"
 
-        # Resumable: lewati jika kedua berkas cache valid & metadata sudah tercatat
         if img_npy.exists() and mask_npy.exists() and image_id in existing_meta:
             records.append(existing_meta[image_id])
             continue
 
         img_path = kermany_root / str(row["rel_path"])
-        assert img_path.exists(), f"Citra Kermany tidak ditemukan: {img_path}"
+        assert img_path.exists(), f"Citra tidak ditemukan: {img_path}"
 
         with Image.open(img_path) as im:
             orig_w, orig_h = im.size
@@ -126,7 +127,6 @@ def run_full_lung_mask_cache(
             )
             m224 = resize_mask_to_224(pred_mask_orig, target_size=target_hw)
 
-        # Validasi kontrak tipe & nilai sebelum tulis ke disk
         assert i224.dtype == np.float32 and i224.shape == target_hw
         assert m224.dtype == np.uint8 and m224.shape == target_hw
         assert set(np.unique(m224)).issubset({0, 1}), f"Mask {image_id} bukan biner!"
@@ -136,19 +136,26 @@ def run_full_lung_mask_cache(
 
         r_orig = compute_r_paru(pred_mask_orig)
         r_224 = compute_r_paru(m224)
+        lr_info = compute_lr_lung_balance(m224, min_lr_ratio=cache_cfg.lr_balance_min_ratio)
 
         rec = {
             "image_id": image_id,
+            "source": str(row.get("source", "kermany")),
             "rel_path": str(row["rel_path"]),
             "split": str(row["split"]),
             "label": str(row["label"]),
             "label_id": int(row["label_id"]),
             "patient_id": str(row["patient_id"]),
+            "group_id": str(row.get("group_id", row["patient_id"])),
+            "view_position": str(row.get("view_position", "UNKNOWN")),
             "orig_h": int(orig_h),
             "orig_w": int(orig_w),
             "r_paru_orig": float(r_orig),
             "r_paru_224": float(r_224),
             "extreme_failure": bool(r_224 < cache_cfg.r_paru_extreme_threshold),
+            "lr_ratio": float(lr_info["lr_ratio"]),
+            "n_lung_components": int(lr_info["n_components"]),
+            "lr_imbalance_flag": bool(lr_info["lr_imbalance_flag"]),
             "image_224_path": f"images_224/{image_id}.npy",
             "mask_224_path": f"masks_224/{image_id}.npy",
         }
@@ -188,7 +195,6 @@ def verify_cache_integrity(
         if not (processed_dir / r["image_224_path"]).exists() or not (processed_dir / r["mask_224_path"]).exists():
             missing_files += 1
 
-    # Cek mendalam tipe data, rentang, binaritas, & alignment pada sampel acak (seed tetap)
     check_df = meta_df.sample(n=min(sample_check_n, len(meta_df)), random_state=seed)
     dtype_ok = True
     binary_ok = True

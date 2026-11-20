@@ -189,6 +189,10 @@ def select_kermany_qc_subset(
 ) -> pd.DataFrame:
     """Pilih subset seimbang dari D_test Kermany (25 Normal + 25 Pneumonia) dengan seed tetap (L3(2))."""
     test_df = split_df[split_df["split"] == "test"].copy() if "split" in split_df.columns else split_df.copy()
+    if "source" in test_df.columns:
+        kerm_only = test_df[test_df["source"].astype(str).str.lower() == "kermany"]
+        if not kerm_only.empty:
+            test_df = kerm_only.copy()
     test_df = test_df.sort_values(by=["label", "image_id"]).reset_index(drop=True)
 
     normal_pool = test_df[test_df["label"] == "Normal"]
@@ -391,10 +395,20 @@ def summarize_full_r_paru(
     metadata_df: pd.DataFrame,
     r_paru_extreme_thr: float = 0.05,
     r_paru_diff_thr: float = 0.05,
+    lr_balance_min_ratio: float = 0.30,
 ) -> Dict[str, Any]:
-    """Ringkas distribusi r_paru lintas seluruh dataset & per partisi (L5, docs/3.md butir 8)."""
+    """Ringkas distribusi r_paru & keseimbangan paru kiri-kanan (r_LR) lintas sumber & partisi."""
     df = metadata_df.copy()
     df["extreme_failure"] = df["r_paru_224"] < r_paru_extreme_thr
+    if "lr_imbalance_flag" not in df.columns:
+        if "lr_ratio" in df.columns:
+            df["lr_imbalance_flag"] = df["lr_ratio"] < lr_balance_min_ratio
+        else:
+            df["lr_imbalance_flag"] = False
+    if "lr_ratio" not in df.columns:
+        df["lr_ratio"] = np.nan
+    if "source" not in df.columns:
+        df["source"] = "kermany"
 
     per_split_class = (
         df.groupby(["split", "label"])
@@ -405,7 +419,22 @@ def summarize_full_r_paru(
             r_paru_median=("r_paru_224", "median"),
             r_paru_min=("r_paru_224", "min"),
             r_paru_max=("r_paru_224", "max"),
+            lr_ratio_mean=("lr_ratio", "mean"),
             n_extreme_fail=("extreme_failure", "sum"),
+            n_lr_imbalance=("lr_imbalance_flag", "sum"),
+        )
+        .reset_index()
+    )
+
+    per_source_class = (
+        df.groupby(["source", "label"])
+        .agg(
+            n_images=("image_id", "count"),
+            r_paru_mean=("r_paru_224", "mean"),
+            r_paru_std=("r_paru_224", "std"),
+            lr_ratio_mean=("lr_ratio", "mean"),
+            n_extreme_fail=("extreme_failure", "sum"),
+            n_lr_imbalance=("lr_imbalance_flag", "sum"),
         )
         .reset_index()
     )
@@ -417,7 +446,9 @@ def summarize_full_r_paru(
             r_paru_mean=("r_paru_224", "mean"),
             r_paru_std=("r_paru_224", "std"),
             r_paru_min=("r_paru_224", "min"),
+            lr_ratio_mean=("lr_ratio", "mean"),
             n_extreme_fail=("extreme_failure", "sum"),
+            n_lr_imbalance=("lr_imbalance_flag", "sum"),
         )
         .reset_index()
     )
@@ -449,7 +480,10 @@ def summarize_full_r_paru(
         "triggers_acr_norm_test": triggers_test,
         "total_extreme_failures": int(df["extreme_failure"].sum()),
         "test_extreme_failures": int(test_df["extreme_failure"].sum()) if not test_df.empty else 0,
+        "total_lr_imbalances": int(df["lr_imbalance_flag"].sum()),
+        "test_lr_imbalances": int(test_df["lr_imbalance_flag"].sum()) if not test_df.empty else 0,
         "per_split_class_df": per_split_class,
+        "per_source_class_df": per_source_class,
         "overall_by_class_df": overall_by_class,
     }
 
