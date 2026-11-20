@@ -131,6 +131,21 @@ def test_perceptual_dedup_detects_cross_source_near_duplicate(tmp_path: Path) ->
             manifest_conflict, tmp_path, check_pixel_hash=True, check_perceptual_hash=True, max_hamming=5
         )
 
+    # Dua citra pasien berbeda dengan anatomi makro serupa TIDAK boleh digabung sebagai duplikat
+    left2 = (((xx - 46) / 20.0) ** 2 + ((yy - 62) / 34.0) ** 2) <= 1.0
+    right2 = (((xx - 82) / 21.0) ** 2 + ((yy - 68) / 36.0) ** 2) <= 1.0
+    other_patient = np.where(left2 | right2, 55.0 + grad * 0.35, 165.0 + grad * 0.45).clip(0, 255).astype(np.uint8)
+    p4 = tmp_path / "rsna_other_patient.png"
+    Image.fromarray(other_patient, mode="L").save(p4)
+    manifest_distinct = pd.DataFrame([
+        {"image_id": "k1", "source": "kermany", "rel_path": "kermany_1.png", "label": "Normal", "patient_id": "1", "group_id": "kermany_1"},
+        {"image_id": "r3", "source": "rsna", "rel_path": "rsna_other_patient.png", "label": "Pneumonia", "patient_id": "3", "group_id": "rsna_3"},
+    ])
+    clean_distinct, _ = run_deduplication(
+        manifest_distinct, tmp_path, check_pixel_hash=True, check_perceptual_hash=True, max_hamming=5
+    )
+    assert len(clean_distinct) == 2
+
 
 def test_lr_lung_balance_qc_detects_unilateral_collapse() -> None:
     # Mask bilateral sehat (kiri & kanan relatif seimbang)
