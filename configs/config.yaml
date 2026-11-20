@@ -42,7 +42,8 @@ locked:
     intensity_range:           {value: [0.0, 1.0], ref: "docs/1.md D5 (skala [0,1] sebelum normalisasi)"}
 
   lung_mask:
-    unet_frozen:               {value: true, ref: "Pendahuluan.tex L57; Metodologi.tex §3.2.2"}
+    segmentation_model:        {value: hybridgnet_chexmask, ref: "Pendahuluan.tex Batasan 3; Metodologi.tex §3.2.2"}
+    unet_frozen:               {value: true, ref: "Pendahuluan.tex Batasan 3; Metodologi.tex §3.2.2 (bobot beku)"}
     binarize_threshold:        {value: 0.5,  ref: "Metodologi.tex §3.2.2"}
     keep_largest_components:   {value: 2,    ref: "Metodologi.tex §3.2.2"}
     hole_filling:              {value: true, ref: "Metodologi.tex §3.2.2"}
@@ -184,6 +185,7 @@ runtime:
     harmonized_png:     data/interim/harmonized_png
     processed:          data/processed
     unet_weights_dir:   models/unet_frozen
+    hybridgnet_weights_dir: models/hybridgnet_frozen
     outputs:            outputs
   DEBUG:                false
   debug_subset_per_class: 64

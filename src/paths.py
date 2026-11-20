@@ -80,6 +80,7 @@ def get_project_paths(project_root: Path | None = None, cfg: dict | None = None)
     harmonized_rel = rel.get("harmonized_png", "data/interim/harmonized_png")
     processed_rel = rel.get("processed", "data/processed")
     unet_rel = rel.get("unet_weights_dir", "models/unet_frozen")
+    hybridgnet_rel = rel.get("hybridgnet_weights_dir", "models/hybridgnet_frozen")
     outputs_rel = rel.get("outputs", "outputs")
 
     return {
@@ -96,6 +97,7 @@ def get_project_paths(project_root: Path | None = None, cfg: dict | None = None)
         "harmonized_png": project_root / harmonized_rel,
         "processed": project_root / processed_rel,
         "unet_frozen": project_root / unet_rel,
+        "hybridgnet_frozen": project_root / hybridgnet_rel,
         "outputs": project_root / outputs_rel,
     }
 
@@ -103,7 +105,7 @@ def get_project_paths(project_root: Path | None = None, cfg: dict | None = None)
 def ensure_output_dirs(project_root: Path | None = None, cfg: dict | None = None) -> Dict[str, Path]:
     """Buat seluruh direktori keluaran/interim (TIDAK menyentuh `data/raw` karena read-only)."""
     paths = get_project_paths(project_root, cfg)
-    for key in ("interim", "harmonized_png", "processed", "unet_frozen", "outputs"):
+    for key in ("interim", "harmonized_png", "processed", "unet_frozen", "hybridgnet_frozen", "outputs"):
         paths[key].mkdir(parents=True, exist_ok=True)
     for sub in (
         "checkpoints",

@@ -39,6 +39,7 @@ EXPECTED_LOCKED = {
         "intensity_range": [0.0, 1.0],
     },
     "lung_mask": {
+        "segmentation_model": "hybridgnet_chexmask",
         "unet_frozen": True,
         "binarize_threshold": 0.5,
         "keep_largest_components": 2,

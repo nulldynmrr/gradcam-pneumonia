@@ -229,12 +229,45 @@ def test_end_to_end_multisource_synthetic_pipeline_and_shortcut_audit(tmp_path: 
     assert len(audit_res["summary_df"]) == 4
 
 
+def test_hybridgnet_pure_pytorch_architecture_and_dispatch() -> None:
+    from src.segmentation.hybridgnet import create_hybridgnet_model, get_hybridgnet_spec
+    from src.segmentation.unet import predict_lung_probability
+
+    spec = get_hybridgnet_spec()
+    assert spec["frozen"] is True
+    assert spec["input_size_hw"] == [1024, 1024]
+
+    model = create_hybridgnet_model(device="cpu")
+    for p in model.parameters():
+        p.requires_grad = False
+    model.eval()
+    assert sum(p.numel() for p in model.parameters() if p.requires_grad) == 0
+
+    dummy_img = np.full((256, 256), 120, dtype=np.uint8)
+    prob = predict_lung_probability(model, dummy_img, device="cpu", return_original_size=True)
+    assert prob.shape == (256, 256)
+    assert prob.dtype == np.float32
+    assert set(np.unique(prob)).issubset({0.0, 1.0})
+
+
 def test_updated_notebooks_valid_python_syntax() -> None:
     repo = get_repo_root()
-    for fname in ("01_data_dedup_split.ipynb", "02_lung_mask_and_qc.ipynb", "02b_shortcut_audit.ipynb"):
-        nb = json.loads((repo / "notebooks" / fname).read_text(encoding="utf-8"))
+    forbidden_md_tokens = ("Gambar 3.1", "AMBIG-", "docs/1.md", "docs/2.md", "docs/3.md", "G3(4)")
+    for nb_path in sorted((repo / "notebooks").glob("*.ipynb")):
+        nb = json.loads(nb_path.read_text(encoding="utf-8"))
+        assert nb["cells"][0]["cell_type"] == "markdown", f"{nb_path.name}: sel pertama harus markdown"
+        h1 = "".join(nb["cells"][0]["source"]).splitlines()[0]
+        assert h1.startswith("# "), f"{nb_path.name}: harus diawali judul H1"
+        assert "Gambar 3.1" not in h1, f"{nb_path.name}: judul H1 tidak boleh memuat 'Gambar 3.1'"
+
         for idx, cell in enumerate(nb["cells"]):
-            if cell["cell_type"] != "code":
-                continue
-            cleaned = [line if not line.lstrip().startswith("!") else "pass" for line in cell["source"]]
-            ast.parse("".join(cleaned), filename=f"{fname}:cell_{idx}")
+            text = "".join(cell["source"])
+            if cell["cell_type"] == "markdown":
+                for tok in forbidden_md_tokens:
+                    assert tok not in text, f"{nb_path.name} cell {idx} masih memuat token internal: {tok}"
+            elif cell["cell_type"] == "code":
+                cleaned = [
+                    (line[: len(line) - len(line.lstrip())] + "pass\n") if line.lstrip().startswith("!") else line
+                    for line in cell["source"]
+                ]
+                ast.parse("".join(cleaned), filename=f"{nb_path.name}:cell_{idx}")

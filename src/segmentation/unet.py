@@ -198,17 +198,21 @@ def predict_lung_probability(
     device: torch.device | str | None = None,
     return_original_size: bool = True,
 ) -> np.ndarray:
-    """Jalankan inferensi U-Net untuk memprediksi peta probabilitas batas paru.
+    """Jalankan inferensi model segmentasi paru beku (HybridGNet maupun U-Net) untuk menghasilkan peta mask/probabilitas.
 
     Args:
-        model: Model U-Net beku hasil `load_frozen_unet`.
+        model: Model segmentasi beku (`HybridGNet` dari CheXmask atau `smp.Unet` legacy).
         image: Citra rontgen CXR masukan (`PIL.Image` atau `np.ndarray`).
         device: Device komputasi.
-        return_original_size: Jika True, resize probabilitas ke ukuran citra asli (AMBIG-1).
+        return_original_size: Jika True, kembalikan peta pada ukuran citra asli.
 
     Returns:
-        np.ndarray: Peta probabilitas kontinu `[0.0, 1.0]` bertipe `float32`.
+        np.ndarray: Peta probabilitas / mask biner kontinu `[0.0, 1.0]` bertipe `float32`.
     """
+    if getattr(model, "is_hybridgnet", False):
+        from src.segmentation.hybridgnet import predict_lung_mask_hybridgnet
+        return predict_lung_mask_hybridgnet(model, image, device=device, return_float_prob=True)
+
     if device is None:
         device = next(model.parameters()).device
 

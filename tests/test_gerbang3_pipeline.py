@@ -221,8 +221,8 @@ def test_synthetic_end_to_end_cache_qc_and_plots(tmp_path: Path) -> None:
 def test_notebooks_02_and_03_valid_syntax_and_gate_check() -> None:
     repo = get_repo_root()
     specs = [
-        ("02_lung_mask_and_qc.ipynb", "# Tahap 1 Gambar 3.1"),
-        ("03_preprocess_sanity_check.ipynb", "# Tahap 2 & 3 Gambar 3.1"),
+        ("02_lung_mask_and_qc.ipynb", "# Tahap 1 —"),
+        ("03_preprocess_sanity_check.ipynb", "# Tahap 2 & Tahap 3 —"),
     ]
     for fname, expected_title_prefix in specs:
         nb = json.loads((repo / "notebooks" / fname).read_text(encoding="utf-8"))
